@@ -4,8 +4,8 @@ import logging
 import pandas as pd
 from dateutil.parser import parse
 
-logger = logging.getLogger("validation-logger")
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger("Validation-log")
+logging.basicConfig(level=logging.INFO)
 
 
 class SchemaValidator:
@@ -36,10 +36,7 @@ class SchemaValidator:
         self.id_fields = ["id", "anonymous_id"]
         self.event_fields = ["event", "event_text"]
         self.events_report = pd.DataFrame(
-            {
-                "Event": pd.Series([], dtype="str"),
-                "Date": pd.Series([], dtype="datetime64[ns]"),
-            }
+            {"Event": pd.Series([], dtype="str"), "Date": pd.Series([], dtype="str"),}
         )
 
     def is_ts_valid(self, ts_str):
@@ -51,7 +48,7 @@ class SchemaValidator:
 
     def is_id_valid(self, id_str):
         return bool(self.id_pattern.match(id_str))
-        
+
     def validate_json(self, str_json):
         try:
             dict_json = json.loads(str_json)
@@ -60,9 +57,10 @@ class SchemaValidator:
             return False
 
     def update_report(self, event_dict):
-        event_name = event_dict.get("event")
+        event_name = event_dict.get("event", "N/A")
         timestamp = event_dict.get("original_timestamp")
-        date = self.is_ts_valid(timestamp).date()
+        datetime = self.is_ts_valid(timestamp)
+        date = datetime.date() if datetime else "N/A"
         self.events_report = self.events_report.append(
             {"Event": event_name, "Date": date}, ignore_index=True
         )
@@ -103,14 +101,14 @@ class SchemaValidator:
         if validation_log:
             logger.warning(
                 (
-                    f"Validation Output for event ({event_dict.get('event')}) "
+                    f"Schema mismatch from ({event_dict.get('event')}) "
                     f"with ID ({event_dict.get('id')}) : \n {str(validation_log)}"
                 )
             )
 
     def generate_report(self):
         final_report = (
-            self.events_report.groupby(["Event", "Date"]).size().to_frame("Count")
+            self.events_report[["Event", "Date"]].value_counts().to_frame("Count")
         )
         logger.info("\n\nEvents Report: \n" + final_report.to_string())
         final_report.to_csv("report.csv")
